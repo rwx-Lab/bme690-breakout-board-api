@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /*__cplusplus */
@@ -105,11 +107,18 @@ void bme69x_delay_us(uint32_t period, void *intf_ptr);
 void bme69x_check_rslt(const char api_name[], int8_t rslt);
 
 /*!
- *  @brief Deinitializes coines platform
+ *  @brief Deinitializes pigpio platform
  *
  *  @return void.
  */
-void bme69x_coines_deinit(void);
+void bme69x_pigpio_deinit(void);
+
+/*!
+ *  @brief Get current time in milliseconds
+ *
+ *  @return Current time in milliseconds
+ */
+uint32_t bme69x_get_millis(void);
 
 #ifdef __cplusplus
 }

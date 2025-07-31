@@ -7,78 +7,161 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <stdbool.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
+#include <pigpio.h>
+#include <string.h>
 #include "bme69x.h"
-#include "coines.h"
 #include "common.h"
 
 /******************************************************************************/
 /*!                 Macro definitions                                         */
-/*! BME69X shuttle board ID */
-#define BME69X_SHUTTLE_ID  0x93
+/*! Default I2C bus for Raspberry Pi */
+#define BME69X_I2C_BUS          1
+
+/*! Default SPI bus for Raspberry Pi */
+#define BME69X_SPI_BUS          0
+
+/*! Default SPI speed */
+#define BME69X_SPI_SPEED        1000000  /* 1 MHz */
 
 /******************************************************************************/
 /*!                Static variable definition                                 */
 static uint8_t dev_addr;
+static int i2c_handle = -1;
+static int spi_handle = -1;
 
 /******************************************************************************/
 /*!                User interface functions                                   */
 
 /*!
- * I2C read function map to COINES platform
+ * I2C read function using pigpio
  */
 BME69X_INTF_RET_TYPE bme69x_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-    uint8_t device_addr = *(uint8_t*)intf_ptr;
-
+    int result;
+    
     (void)intf_ptr;
 
-    return coines_read_i2c(COINES_I2C_BUS_0, device_addr, reg_addr, reg_data, (uint16_t)len);
+    if (i2c_handle < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    result = i2cWriteDevice(i2c_handle, (char*)&reg_addr, 1);
+    if (result < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    result = i2cReadDevice(i2c_handle, (char*)reg_data, len);
+    if (result != (int)len) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    return BME69X_INTF_RET_SUCCESS;
 }
 
 /*!
- * I2C write function map to COINES platform
+ * I2C write function using pigpio
  */
 BME69X_INTF_RET_TYPE bme69x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-    uint8_t device_addr = *(uint8_t*)intf_ptr;
-
+    int result;
+    char buffer[len + 1];
+    
     (void)intf_ptr;
 
-    return coines_write_i2c(COINES_I2C_BUS_0, device_addr, reg_addr, (uint8_t *)reg_data, (uint16_t)len);
+    if (i2c_handle < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    buffer[0] = reg_addr;
+    for (uint32_t i = 0; i < len; i++) {
+        buffer[i + 1] = reg_data[i];
+    }
+
+    result = i2cWriteDevice(i2c_handle, buffer, len + 1);
+    if (result < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    return BME69X_INTF_RET_SUCCESS;
 }
 
 /*!
- * SPI read function map to COINES platform
+ * SPI read function using pigpio
  */
 BME69X_INTF_RET_TYPE bme69x_spi_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-    uint8_t device_addr = *(uint8_t*)intf_ptr;
-
+    int result;
+    char tx_buffer[len + 1];
+    char rx_buffer[len + 1];
+    
     (void)intf_ptr;
 
-    return coines_read_spi(COINES_SPI_BUS_0, device_addr, reg_addr, reg_data, (uint16_t)len);
+    if (spi_handle < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    tx_buffer[0] = reg_addr | 0x80;
+    for (uint32_t i = 1; i <= len; i++) {
+        tx_buffer[i] = 0;
+    }
+
+    result = spiXfer(spi_handle, tx_buffer, rx_buffer, len + 1);
+    if (result < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    for (uint32_t i = 0; i < len; i++) {
+        reg_data[i] = rx_buffer[i + 1];
+    }
+
+    return BME69X_INTF_RET_SUCCESS;
 }
 
 /*!
- * SPI write function map to COINES platform
+ * SPI write function using pigpio
  */
 BME69X_INTF_RET_TYPE bme69x_spi_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-    uint8_t device_addr = *(uint8_t*)intf_ptr;
-
+    int result;
+    char tx_buffer[len + 1];
+    
     (void)intf_ptr;
 
-    return coines_write_spi(COINES_SPI_BUS_0, device_addr, reg_addr, (uint8_t *)reg_data, (uint16_t)len);
+    if (spi_handle < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    tx_buffer[0] = reg_addr & 0x7F;
+    for (uint32_t i = 0; i < len; i++) {
+        tx_buffer[i + 1] = reg_data[i];
+    }
+
+    result = spiWrite(spi_handle, tx_buffer, len + 1);
+    if (result < 0) {
+        return BME69X_E_COM_FAIL;
+    }
+
+    return BME69X_INTF_RET_SUCCESS;
 }
 
 /*!
- * Delay function map to COINES platform
+ * Delay function using pigpio
  */
 void bme69x_delay_us(uint32_t period, void *intf_ptr)
 {
     (void)intf_ptr;
-    coines_delay_usec(period);
+    gpioDelay(period);
+}
+
+uint32_t bme69x_get_millis(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint32_t)((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 }
 
 void bme69x_check_rslt(const char api_name[], int8_t rslt)
@@ -116,69 +199,55 @@ void bme69x_check_rslt(const char api_name[], int8_t rslt)
 int8_t bme69x_interface_init(struct bme69x_dev *bme, uint8_t intf)
 {
     int8_t rslt = BME69X_OK;
-    struct coines_board_info board_info;
 
     if (bme != NULL)
     {
-        int16_t result = coines_open_comm_intf(COINES_COMM_INTF_USB, NULL);
-        if (result < COINES_SUCCESS)
+        if (gpioInitialise() < 0)
         {
-            printf(
-                "\n Unable to connect with Application Board ! \n" " 1. Check if the board is connected and powered on. \n" " 2. Check if Application Board USB driver is installed. \n"
-                " 3. Check if board is in use by another application. (Insufficient permissions to access USB) \n");
-            exit(result);
+            printf("Failed to initialize pigpio library\n");
+            return BME69X_E_COM_FAIL;
         }
 
-        result = coines_get_board_info(&board_info);
+        printf("pigpio library initialized successfully\n");
 
-#if defined(PC)
-        setbuf(stdout, NULL);
-#endif
-
-        if (result == COINES_SUCCESS)
-        {
-            if ((board_info.shuttle_id != BME69X_SHUTTLE_ID))
-            {
-                printf(
-                    "! Warning invalid sensor shuttle : 0x%x (Expected : 0x%x) \n ," "This application will not support this sensor \n",
-                    board_info.shuttle_id,
-                    BME69X_SHUTTLE_ID);
-            }
-        }
-
-        (void)coines_set_shuttleboard_vdd_vddio_config(0, 0);
-        coines_delay_msec(100);
-
-        /* Bus configuration : I2C */
         if (intf == BME69X_I2C_INTF)
         {
             printf("I2C Interface\n");
-            dev_addr = BME69X_I2C_ADDR_LOW;
+            dev_addr = BME69X_I2C_ADDR_HIGH;
+            
+            i2c_handle = i2cOpen(BME69X_I2C_BUS, dev_addr, 0);
+            if (i2c_handle < 0)
+            {
+                printf("Failed to open I2C bus %d, device 0x%02X\n", BME69X_I2C_BUS, dev_addr);
+                gpioTerminate();
+                return BME69X_E_COM_FAIL;
+            }
+            
+            printf("I2C connection opened successfully (handle: %d)\n", i2c_handle);
+            
             bme->read = bme69x_i2c_read;
             bme->write = bme69x_i2c_write;
             bme->intf = BME69X_I2C_INTF;
-
-            /* SDO pin is made low */
-            (void)coines_set_pin_config(COINES_SHUTTLE_PIN_SDO, COINES_PIN_DIRECTION_OUT, COINES_PIN_VALUE_LOW);
-
-            (void)coines_config_i2c_bus(COINES_I2C_BUS_0, COINES_I2C_STANDARD_MODE);
         }
         /* Bus configuration : SPI */
         else if (intf == BME69X_SPI_INTF)
         {
             printf("SPI Interface\n");
-            dev_addr = COINES_SHUTTLE_PIN_7;
+            
+            spi_handle = spiOpen(BME69X_SPI_BUS, BME69X_SPI_SPEED, 0);
+            if (spi_handle < 0)
+            {
+                printf("Failed to open SPI bus %d\n", BME69X_SPI_BUS);
+                gpioTerminate();
+                return BME69X_E_COM_FAIL;
+            }
+            
+            printf("SPI connection opened successfully (handle: %d)\n", spi_handle);
+            
             bme->read = bme69x_spi_read;
             bme->write = bme69x_spi_write;
             bme->intf = BME69X_SPI_INTF;
-            (void)coines_config_spi_bus(COINES_SPI_BUS_0, COINES_SPI_SPEED_7_5_MHZ, COINES_SPI_MODE0);
         }
-
-        coines_delay_msec(100);
-
-        (void)coines_set_shuttleboard_vdd_vddio_config(3300, 3300);
-
-        coines_delay_msec(100);
 
         bme->delay_us = bme69x_delay_us;
         bme->intf_ptr = &dev_addr;
@@ -192,15 +261,21 @@ int8_t bme69x_interface_init(struct bme69x_dev *bme, uint8_t intf)
     return rslt;
 }
 
-void bme69x_coines_deinit(void)
+void bme69x_pigpio_deinit(void)
 {
     (void)fflush(stdout);
 
-    (void)coines_set_shuttleboard_vdd_vddio_config(0, 0);
-    coines_delay_msec(1000);
+    if (i2c_handle >= 0)
+    {
+        i2cClose(i2c_handle);
+        i2c_handle = -1;
+    }
 
-    /* Coines interface reset */
-    coines_soft_reset();
-    coines_delay_msec(1000);
-    (void)coines_close_comm_intf(COINES_COMM_INTF_USB, NULL);
+    if (spi_handle >= 0)
+    {
+        spiClose(spi_handle);
+        spi_handle = -1;
+    }
+
+    gpioTerminate();
 }

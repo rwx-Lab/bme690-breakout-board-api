@@ -9,7 +9,6 @@
 
 #include "bme69x.h"
 #include "common.h"
-#include "coines.h"
 
 /***********************************************************************/
 /*                         Macros                                      */
@@ -84,7 +83,7 @@ int main(void)
         del_period = bme69x_get_meas_dur(BME69X_SEQUENTIAL_MODE, &conf, &bme) + (heatr_conf.heatr_dur_prof[0] * 1000);
         bme.delay_us(del_period, bme.intf_ptr);
 
-        time_ms = coines_get_millis();
+        time_ms = bme69x_get_millis();
 
         rslt = bme69x_get_data(BME69X_SEQUENTIAL_MODE, data, &n_fields, &bme);
         bme69x_check_rslt("bme69x_get_data", rslt);
@@ -93,33 +92,33 @@ int main(void)
         for (uint8_t i = 0; i < n_fields; i++)
         {
 #ifdef BME69X_USE_FPU
-            printf("%u,%lu,%.2f,%.2f,%.2f,%.2f,0x%x,%d,%d\n",
-                   sample_count,
-                   (long unsigned int)time_ms + (i * (del_period / 2000)),
-                   data[i].temperature,
-                   data[i].pressure,
-                   data[i].humidity,
-                   data[i].gas_resistance,
-                   data[i].status,
-                   data[i].gas_index,
-                   data[i].meas_index);
+                printf("%u,%lu,%.2f,%.2f,%.2f,%.2f,0x%x,%d,%d\n",
+                       sample_count,
+                       (long unsigned int)time_ms + (i * (del_period / 2000)),
+                       data[i].temperature,
+                       data[i].pressure,
+                       data[i].humidity,
+                       data[i].gas_resistance,
+                       data[i].status,
+                       data[i].gas_index,
+                       data[i].meas_index);
 #else
-            printf("%u, %lu, %d, %lu, %lu, %lu, 0x%x, %d, %d\n",
-                   sample_count,
-                   (long unsigned int)time_ms + (i * (del_period / 2000)),
-                   (data[i].temperature),
-                   (long unsigned int)data[i].pressure,
-                   (long unsigned int)(data[i].humidity),
-                   (long unsigned int)data[i].gas_resistance,
-                   data[i].status,
-                   data[i].gas_index,
-                   data[i].meas_index);
+                printf("%u, %lu, %d, %lu, %lu, %lu, 0x%x, %d, %d\n",
+                       sample_count,
+                       (long unsigned int)time_ms + (i * (del_period / 2000)),
+                       (data[i].temperature),
+                       (long unsigned int)data[i].pressure,
+                       (long unsigned int)(data[i].humidity),
+                       (long unsigned int)data[i].gas_resistance,
+                       data[i].status,
+                       data[i].gas_index,
+                       data[i].meas_index);
 #endif
-            sample_count++;
+                sample_count++;
+            }
         }
-    }
 
-    bme69x_coines_deinit();
+    bme69x_pigpio_deinit();
 
     return 0;
 }

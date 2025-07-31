@@ -9,7 +9,6 @@
 
 #include "bme69x.h"
 #include "common.h"
-#include "coines.h"
 
 /***********************************************************************/
 /*                         Macros                                      */
@@ -62,47 +61,46 @@ int main(void)
 
     printf("Sample, TimeStamp(ms), Temperature(deg C), Pressure(Pa), Humidity(%%), Gas resistance(ohm), Status\n");
 
-    while (sample_count <= SAMPLE_COUNT)
+    while (sample_count <= SAMPLE_COUNT)  
     {
         rslt = bme69x_set_op_mode(BME69X_FORCED_MODE, &bme);
         bme69x_check_rslt("bme69x_set_op_mode", rslt);
 
-        /* Calculate delay period in microseconds */
         del_period = bme69x_get_meas_dur(BME69X_FORCED_MODE, &conf, &bme) + (heatr_conf.heatr_dur * 1000);
         bme.delay_us(del_period, bme.intf_ptr);
 
-        time_ms = coines_get_millis();
+        time_ms = bme69x_get_millis();
 
         /* Check if rslt == BME69X_OK, report or handle if otherwise */
         rslt = bme69x_get_data(BME69X_FORCED_MODE, &data, &n_fields, &bme);
         bme69x_check_rslt("bme69x_get_data", rslt);
 
         if (n_fields)
-        {
+            {
 #ifdef BME69X_USE_FPU
-            printf("%u, %lu, %.2f, %.2f, %.2f, %.2f, 0x%x\n",
-                   sample_count,
-                   (long unsigned int)time_ms,
-                   data.temperature,
-                   data.pressure,
-                   data.humidity,
-                   data.gas_resistance,
-                   data.status);
+                printf("%u, %lu, %.2f, %.2f, %.2f, %.2f, 0x%x\n",
+                       sample_count,
+                       (long unsigned int)time_ms,
+                       data.temperature,
+                       data.pressure,
+                       data.humidity,
+                       data.gas_resistance,
+                       data.status);
 #else
-            printf("%u, %lu, %d, %ld, %ld, %ld, 0x%x\n",
-                   sample_count,
-                   (long unsigned int)time_ms,
-                   data.temperature,
-                   data.pressure,
-                   data.humidity,
-                   data.gas_resistance,
-                   data.status);
+                printf("%u, %lu, %d, %ld, %ld, %ld, 0x%x\n",
+                       sample_count,
+                       (long unsigned int)time_ms,
+                       data.temperature,
+                       data.pressure,
+                       data.humidity,
+                       data.gas_resistance,
+                       data.status);
 #endif
-            sample_count++;
+                sample_count++;
         }
     }
 
-    bme69x_coines_deinit();
+    bme69x_pigpio_deinit();
 
     return rslt;
 }

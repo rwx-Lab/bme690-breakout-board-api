@@ -1,5 +1,3 @@
-COINES_INSTALL_PATH ?= ../../../..
-
 EXAMPLE_FILE ?= parallel_mode.c
 
 API_LOCATION ?= ../..
@@ -12,6 +10,18 @@ INCLUDEPATHS += \
 $(API_LOCATION) \
 ../common
 
-COINES_BACKEND?=COINES_BRIDGE
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -O2 $(addprefix -I,$(INCLUDEPATHS))
+LDFLAGS = -lpigpio -lrt -lpthread
 
-include $(COINES_INSTALL_PATH)/coines.mk
+TARGET = $(basename $(EXAMPLE_FILE))
+
+all: $(TARGET)
+
+$(TARGET): $(C_SRCS) $(EXAMPLE_FILE)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET)
+
+.PHONY: all clean

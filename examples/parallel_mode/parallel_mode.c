@@ -9,17 +9,10 @@
 
 #include "bme69x.h"
 #include "common.h"
-#include "coines.h"
 
 /***********************************************************************/
 /*                         Macros                                      */
 /***********************************************************************/
-
-/*
- * Macro definition for valid new data (0x80) AND
- * heater stability (0x10) AND gas resistance (0x20) values
- */
-#define BME69X_VALID_DATA  UINT8_C(0xB0)
 
 /* Macro for count of samples to be displayed */
 #define SAMPLE_COUNT       UINT8_C(50)
@@ -50,7 +43,7 @@ int main(void)
      * For I2C : BME69X_I2C_INTF
      * For SPI : BME69X_SPI_INTF
      */
-    rslt = bme69x_interface_init(&bme, BME69X_SPI_INTF);
+    rslt = bme69x_interface_init(&bme, BME69X_I2C_INTF);
     bme69x_check_rslt("bme69x_interface_init", rslt);
 
     rslt = bme69x_init(&bme);
@@ -97,7 +90,7 @@ int main(void)
         del_period = bme69x_get_meas_dur(BME69X_PARALLEL_MODE, &conf, &bme) + (heatr_conf.shared_heatr_dur * 1000);
         bme.delay_us(del_period, bme.intf_ptr);
 
-        time_ms = coines_get_millis();
+        time_ms = bme69x_get_millis();
 
         rslt = bme69x_get_data(BME69X_PARALLEL_MODE, data, &n_fields, &bme);
         bme69x_check_rslt("bme69x_get_data", rslt);
@@ -105,8 +98,6 @@ int main(void)
         /* Check if rslt == BME69X_OK, report or handle if otherwise */
         for (uint8_t i = 0; i < n_fields; i++)
         {
-            if (data[i].status == BME69X_VALID_DATA)
-            {
 #ifdef BME69X_USE_FPU
                 printf("%u, %lu, %.2f, %.2f, %.2f, %.2f, 0x%x, %d, %d\n",
                        sample_count,
@@ -133,9 +124,8 @@ int main(void)
                 sample_count++;
             }
         }
-    }
 
-    bme69x_coines_deinit();
+    bme69x_pigpio_deinit();
 
     return 0;
 }

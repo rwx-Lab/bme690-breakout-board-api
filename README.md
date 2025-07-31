@@ -1,21 +1,60 @@
-# BME69X SensorAPI
+# BME690 API using pigpio for Raspberry Pi
 
-> Bosch Sensortec's BME690 SensorAPI
+This is a port of the [Bosch Sensortec BME690 SensorAPI](https://github.com/boschsensortec/BME690_SensorAPI) 
+to work with the pigpio library on Raspberry Pi.
 
-## Sensor Overview
-BME690 is an integrated environmental sensor developed specifically for mobile applications and wearables where size and low power consumption are key requirements. Expanding Bosch Sensortec’s existing family of environmental sensors, the BME690 integrates for the first time high-linearity and high-accuracy gas, pressure, humidity and temperature sensors. It consists of an 8-pin metal-lid 3.0 x 3.0 x 0.93 mm³ LGA package which is designed for optimized consumption depending on the specific operating mode, long term stability and high EMC robustness. The gas sensor within the BME690 can detect a broad range of gases to measure air quality for personal well being. Gases that can be detected by the BME690 include Volatile Organic Compounds (VOC) from paints (such as formaldehyde), lacquers, paint strippers, cleaning supplies, furnishings, office equipment, glues, adhesives and alcohol.
+Based on the BME690 SensorAPI by Bosch Sensortec GmbH, licensed under BSD-3-Clause.
 
-### Features
+## Getting Started on Raspberry Pi
 
-- Air quality measurement
-- Personalized weather station
-- Context awareness, e.g. skin moisture detection, room change detection
-- Fitness monitoring / well-being
-- Warning regarding dryness or high temperatures
-- Measurement of volume and air flow
-- Home automation control (e.g. HVAC)
-- GPS enhancement (e.g. time-to-first-fix improvement, dead reckoning, slope detection)
-- Indoor navigation (change of floor detection, elevator detection)
-- Altitude tracking and calories expenditure for sports activities
+This repository provides examples for interfacing with the BME690 sensor directly on Raspberry Pi using the pigpio library. 
 
----
+### Installation
+
+1. **Install the pigpio library**:
+   ```bash
+   sudo apt update
+   sudo apt install pigpio pigpio-tools libpigpio-dev
+   ```
+
+2. **Clone the repository**:
+   ```bash
+   git clone https://github.com/rwx-Lab/bme690-breakout-board-api.git
+   cd bme690-breakout-board-api
+   ```
+
+### Building Examples
+
+Navigate to any example directory and build:
+
+```bash
+cd examples/forced_mode
+make
+```
+
+Available examples:
+- `forced_mode` - Single-shot measurements
+- `parallel_mode` - Continuous measurements with multiple heater profiles
+- `sequential_mode` - Sequential measurements with different heater profiles  
+- `self_test` - Sensor validation and diagnostics
+
+### Running Examples
+
+**Important**: The examples use pigpio directly and require root privileges because they initialize their own pigpio instance.
+
+1. **Stop the pigpio daemon** (if running):
+   ```bash
+   sudo systemctl stop pigpiod
+   ```
+   
+   If the service doesn't stop properly, you can force-kill any remaining processes:
+   ```bash
+   sudo killall pigpiod
+   ```
+
+2. **Run the example**:
+   ```bash
+   sudo ./forced_mode
+   ```
+
+**Why sudo is required**: The examples use `gpioInitialise()` to directly access GPIO hardware, which requires root privileges. This conflicts with the system pigpiod daemon, so it must be stopped first.
