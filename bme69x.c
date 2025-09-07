@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2024 Bosch Sensortec GmbH. All rights reserved.
+* Copyright (c) 2025 Bosch Sensortec GmbH. All rights reserved.
 *
 * BSD-3-Clause
 *
@@ -31,8 +31,8 @@
 * POSSIBILITY OF SUCH DAMAGE.
 *
 * @file       bme69x.c
-* @date       2024-05-14
-* @version    v1.0.1
+* @date       2025-07-15
+* @version    v1.0.3
 *
 */
 
@@ -905,6 +905,17 @@ static uint32_t calc_humidity(uint16_t hum_adc, int16_t comp_temperature, const 
            2097152ULL) * dev->calib.par_h5 + 8192UL) / 16384UL);
 
     var_H = var_H - (((((var_H / 32768UL) * (var_H / 32768UL)) / 128UL) * dev->calib.par_h6) / 16UL);
+
+    if (var_H < 0)
+    {
+        var_H = 0;
+    }
+
+    if (var_H > 419430400)
+    {
+        var_H = 419430400;
+    }
+
     hum_comp = (uint32_t)(var_H / 4096UL);
 
     return hum_comp;
@@ -1027,7 +1038,8 @@ static float calc_humidity(uint16_t hum_adc, float comp_temperature, const struc
     double oh, tk10h, sh;
     double tk1sh, tk2sh, hlin2;
     double hoff, hsens;
-    double temp_comp, calc_hum, temp_var_1;
+    double temp_comp, calc_hum, hum_float_val;
+    int32_t hum_int_val;
 
     temp_comp = (comp_temperature * 5120) - 76800;
 
@@ -1040,8 +1052,21 @@ static float calc_humidity(uint16_t hum_adc, float comp_temperature, const struc
 
     hoff = (double)hum_adc - (oh + tk10h * temp_comp);
     hsens = hoff * sh * (1 + (tk1sh * temp_comp) + (tk1sh * tk2sh * temp_comp * temp_comp));
-    temp_var_1 = hsens * (1 - hlin2 * hsens);
-    calc_hum = temp_var_1;
+    hum_float_val = hsens * (1 - hlin2 * hsens);
+
+    /* Avoid direct floating-point comparison by using integer scaling */
+    hum_int_val = (int32_t)(hum_float_val * 1000.0f);
+
+    if (hum_int_val >= 100000)
+    {
+        hum_float_val = 100.0;
+    }
+    else if (hum_int_val < 0)
+    {
+        hum_float_val = 0.0;
+    }
+
+    calc_hum = hum_float_val;
 
     return (float)calc_hum;
 }
@@ -1721,8 +1746,23 @@ static int8_t get_calib_data(struct bme69x_dev *dev)
         /* Humidity related coefficients */
         dev->calib.par_h5 =
             (int16_t)(((int16_t)coeff_array[BME69X_IDX_S_H_MSB] << 4) | (coeff_array[BME69X_IDX_S_H_LSB] >> 4));
+
+        if (dev->calib.par_h5 > 2047)
+        {
+            /* Convert to negative value */
+            dev->calib.par_h5 = (int16_t)(dev->calib.par_h5 - 4096);
+        }
+
         dev->calib.par_h1 =
             (int16_t)(((int16_t)coeff_array[BME69X_IDX_O_H_MSB] << 4) | (coeff_array[BME69X_IDX_O_H_LSB] & 0x0F));
+
+        /* Check if the value is above 2047 */
+        if (dev->calib.par_h1 > 2047)
+        {
+            /* Convert to negative value */
+            dev->calib.par_h1 = (int16_t)(dev->calib.par_h1 - 4096);
+        }
+
         dev->calib.par_h2 = (int8_t)coeff_array[BME69X_IDX_TK10H_C];
         dev->calib.par_h4 = (int8_t)coeff_array[BME69X_IDX_par_h4];
         dev->calib.par_h3 = (uint8_t)coeff_array[BME69X_IDX_par_h3];
